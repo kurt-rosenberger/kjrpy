@@ -4,7 +4,7 @@
 import argparse
 
 parser=argparse.ArgumentParser(
-    description='''Script to convert raw continuous data from Marotte HS current
+    description='''Script to convert raw burst data from Marotte HS current
         meter to netCDF. Parsing into bursts and conversion to engineering units
         occurs in MarotteContinuous2burstnc.nc. ''',
     epilog="""Config file inputs:
@@ -12,8 +12,8 @@ parser=argparse.ArgumentParser(
                 burst_size: 1200 (in seconds)
                 initial_instrument_height: 0.05  # meters
                 initial_instrument_height_note: 'Above grate'
-                INST_TYPE: Solinst Levelogger CTD
-                rawfile: 'Pressure_Compensated _ilename.csv'
+                INST_TYPE: 'Marotte HS Current Meter'
+                rawfile: 'raw_file_converted_by_MarotteHS_software.csv'
                 instrument_number: MOORING+number of instrument on platform.""")
 
 parser.add_argument('gatts_file', nargs=1, default=[], help='global attributes text file')
