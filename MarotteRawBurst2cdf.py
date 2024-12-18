@@ -7,7 +7,7 @@ parser=argparse.ArgumentParser(
     description='''Script to convert raw burst data from Marotte HS current
         meter to netCDF. Parsing into bursts and conversion to engineering units
         occurs in MarotteContinuous2burstnc.nc. ''',
-    epilog="""Config file inputs:
+    epilog="""Example Config file inputs:
                 Serial_number: Serial Number
                 burst_size: 1200 (in seconds)
                 initial_instrument_height: 0.05  # meters
@@ -83,7 +83,7 @@ for k in range(len(vars)):
 
 ds.attrs = metadata
 ds.attrs['Conventions'] = 1.6
-
+ds.attrs['INST_TYPE'] = 'Marotte HS Current Meter'
 
 ds["time"].attrs.update({"standard_name": "time", "axis": "T", "long_name": "time (UTC)"})
 

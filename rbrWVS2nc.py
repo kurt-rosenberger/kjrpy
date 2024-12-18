@@ -1,9 +1,3 @@
-import xarray as xr
-import pandas as pd
-from stglib.core import utils
-import yaml
-import sys
-import os
 import argparse
 
 parser=argparse.ArgumentParser(
@@ -14,6 +8,14 @@ parser=argparse.ArgumentParser(
 parser.add_argument('ncfilename', nargs=1, default=[], help='netcdf file of processed data')
 #parser.add_argument('config_file', nargs=1, default=[], help='instrument configuration text file')
 args=parser.parse_args()
+
+
+import xarray as xr
+import pandas as pd
+from stglib.core import utils
+import yaml
+import sys
+import os
 # parse the arguments
 args = sys.argv[1:]
 ncfilename = sys.argv[1]

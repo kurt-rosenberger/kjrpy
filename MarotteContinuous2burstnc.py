@@ -15,22 +15,38 @@ args=parser.parse_args()
 import sys
 import os
 sys.path.append('//Users/kurt/Documents/Github/kjrpy')
+sys.path.append('//Users/kurt/Documents/Github/djnpy')
 import pandas as pd
 import xarray as xr
 import numpy as np
 from stglib.core import utils
 import cmgutils
+import djn
 
 args = sys.argv[1:]
 rawcdffile = sys.argv[1]
 
 print('Loading raw data from file %s' % rawcdffile)
 raw = xr.open_dataset(rawcdffile)
+magvar = raw.attrs['magnetic_variation']
+if 'history' in raw.attrs.values():
+    histtext = raw.attrs['history'] = ': '
+else:
+    histtext = ''
 #raw = xr.open_dataset(cfg['rawcdffile'])
 df = raw.to_dataframe()
 df.speed = df.speed*100
-# calculate u and v and drop columns we don't need
-df['u'],df['v'] = cmgutils.spd2uv(df.speed,df.direction)
+# calculate u and v, correct for magnetic variation if it wasn't done in preprocessing
+u,v = cmgutils.spd2uv(df.speed,df.heading)
+if np.atleast_1d(raw.attrs['magnetic_variation_applied']).nonzero():
+    df['u']=u
+    df['v']=v
+    histtext = histtext + 'magnetic varition applied by MarotteHS Software'
+else:
+    df['u'],df['v'] = cmgutils.rotate(u,v,magvar)
+    histtext = histtext + 'magnetic varition applied by MarotteBurstcdf2nc.py'
+
+
 df.drop(columns={'speed upper','speed lower','tilt','direction','batt'},inplace=True)
 attrs = raw.attrs
 
@@ -40,8 +56,8 @@ ncstatsfile = os.path.splitext(rawcdffile)[0] + '-s.nc'
 
 #create time vector on the desired burst interval
 delt = pd.to_timedelta(attrs['burst_size'],unit='s')
-t0 = df.index.floor('H')[1]
-tend = df.index.floor('H')[-1]
+t0 = df.index.floor('h')[1]
+tend = df.index.floor('h')[-1]
 newtime = pd.date_range(start=t0,end=tend,freq=delt)
 
 # get burst length in terms of samples, not seconds
@@ -63,14 +79,14 @@ else:
 crop = df[i1:i2]
 
 # reshape into bursts and make sure time is correct length
-resh = np.empty([n,nbursts,sample])
+resh = np.empty([n,sample,nbursts])
 for ind,column in enumerate(crop.columns):
-    resh[ind::]=np.reshape(crop[column],[nbursts,sample])
+    resh[ind::]=np.reshape(crop[column],[sample,nbursts])
 time = newtime[:nbursts]
 burst = np.arange(1,nbursts)
 
 # define new column names
-cols = ['CS_300','CS_310','T_28','u_1205','v_1206']
+cols = ['CS_300','CD_310','T_28','u_1205','v_1206']
 
 
 ds = xr.Dataset()
@@ -80,7 +96,7 @@ ds["sample"] = xr.DataArray(np.arange(0, sample), dims="sample")
 
 # reshape into bursts
 for ind,k in enumerate(cols):
-    ds[k] = xr.DataArray(resh[ind,:,:],dims=('time','sample'))
+    ds[k] = xr.DataArray(resh[ind,:,:],dims=('sample','time'))
 
 #grab the attributes from the raw file, but remove history
 attrs = raw.attrs
@@ -98,15 +114,15 @@ def update_vatts(ds):
     ds["CS_300"].attrs.update(
         {
             "units": "cm/s",
-            "long_name": "Sea Surface Current Speed (cm/s)",
+            "long_name": "Current Speed (cm/s)",
             "epic_code": 300,
         }
     )
 
-    ds["CS_310"].attrs.update(
+    ds["CD_310"].attrs.update(
         {
             "units": "cm/s",
-            "long_name": "Sea Surface Current Direction (deg)",
+            "long_name": "Current Direction (deg)",
             "epic_code": 310,
         }
     )
@@ -144,7 +160,12 @@ print('Writing burst data to %s' % ncburstfile)
 ds.to_netcdf(ncburstfile)
 
 # now calculate burst mean stats
+ds = ds.drop_vars(["CS_300","CD_310"])
 ds_s = ds.mean(dim='sample')
+# recalculate speed and direction from mean U and V
+spd,dir = djn.uv2sd(ds_s['u_1205'],ds_s['v_1206'])
+ds_s['CS_300'] = xr.DataArray(spd,dims='time')
+ds_s['CD_310'] = xr.DataArray(dir,dims='time')
 
 ds_s = update_vatts(ds_s)
 ds_s.attrs = attrs
